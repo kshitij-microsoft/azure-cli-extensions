@@ -91,6 +91,7 @@ from .java_component_decorator import (
 )
 from .containerapp_sessionpool_decorator import SessionPoolPreviewDecorator, SessionPoolCreateDecorator, SessionPoolUpdateDecorator
 from .containerapp_session_code_interpreter_decorator import SessionCodeInterpreterCommandsPreviewDecorator
+from .containerapp_session_custom_container_decorator import SessionCustomContainerCommandsPreviewDecorator
 from .containerapp_job_registry_decorator import ContainerAppJobRegistryPreviewSetDecorator
 from .containerapp_env_maintenance_config_decorator import ContainerAppEnvMaintenanceConfigPreviewDecorator
 from .dotnet_component_decorator import DotNetComponentDecorator
@@ -111,9 +112,9 @@ from ._clients import (
     JavaComponentPreviewClient,
     SessionPoolPreviewClient,
     SessionCodeInterpreterPreviewClient,
+    SessionCustomContainerPreviewClient,
     DotNetComponentPreviewClient,
     MaintenanceConfigPreviewClient,
-    HttpRouteConfigPreviewClient,
     LabelHistoryPreviewClient
 )
 from ._dev_service_utils import DevServiceUtils
@@ -1320,7 +1321,8 @@ def containerapp_up(cmd,
                     connected_cluster_id=None,
                     model_registry=None,
                     model_name=None,
-                    model_version=None):
+                    model_version=None,
+                    kind=None):
     from ._up_utils import (_validate_up_args, _validate_custom_location_connected_cluster_args, _reformat_image, _get_dockerfile_content, _get_ingress_and_target_port,
                             ResourceGroup, Extension, CustomLocation, ContainerAppEnvironment, ContainerApp, _get_registry_from_app,
                             _get_registry_details, _get_registry_details_without_get_creds, _create_github_action, _set_up_defaults, up_output,
@@ -1383,7 +1385,7 @@ def containerapp_up(cmd,
     custom_location = CustomLocation(cmd, name=custom_location_id, resource_group_name=resource_group_name, connected_cluster_id=connected_cluster_id)
     extension = Extension(cmd, logs_rg=resource_group_name, logs_location=location, logs_share_key=logs_key, logs_customer_id=logs_customer_id, connected_cluster_id=connected_cluster_id)
     env = ContainerAppEnvironment(cmd, environment, resource_group, location=location, logs_key=logs_key, logs_customer_id=logs_customer_id, custom_location_id=custom_location_id, connected_cluster_id=connected_cluster_id, is_env_for_azml_app=is_azureml_app)
-    app = ContainerApp(cmd, name, resource_group, None, image, env, target_port, registry_server, registry_user, registry_pass, env_vars, workload_profile_name, ingress, registry_identity=registry_identity, user_assigned=user_assigned, system_assigned=system_assigned, revisions_mode=revisions_mode, target_label=target_label)
+    app = ContainerApp(cmd, name, resource_group, None, image, env, target_port, registry_server, registry_user, registry_pass, env_vars, workload_profile_name, ingress, registry_identity=registry_identity, user_assigned=user_assigned, system_assigned=system_assigned, revisions_mode=revisions_mode, target_label=target_label, kind=kind)
 
     # Check and see if registry (username and passwords) or registry-identity are specified. If so, set is_registry_server_params_set to True to use those creds.
     is_registry_server_params_set = bool(registry_server and ((registry_user and registry_pass) or registry_identity))
@@ -1431,7 +1433,7 @@ def containerapp_up(cmd,
     up_output(app, no_dockerfile=(source and not _has_dockerfile(source, dockerfile)))
 
 
-def containerapp_up_logic(cmd, resource_group_name, name, managed_env, image, env_vars, ingress, target_port, registry_server, registry_user, workload_profile_name, registry_pass, environment_type=None, force_single_container_updates=False, registry_identity=None, system_assigned=None, user_assigned=None, revisions_mode=None, target_label=None, cpu=None, memory=None):
+def containerapp_up_logic(cmd, resource_group_name, name, managed_env, image, env_vars, ingress, target_port, registry_server, registry_user, workload_profile_name, registry_pass, environment_type=None, force_single_container_updates=False, registry_identity=None, system_assigned=None, user_assigned=None, revisions_mode=None, target_label=None, cpu=None, memory=None, kind=None):
     containerapp_def = None
     try:
         containerapp_def = ContainerAppPreviewClient.show(cmd=cmd, resource_group_name=resource_group_name, name=name)
@@ -1443,7 +1445,7 @@ def containerapp_up_logic(cmd, resource_group_name, name, managed_env, image, en
                                          registry_server=registry_server, registry_user=registry_user, registry_pass=registry_pass, workload_profile_name=workload_profile_name, container_name=name, force_single_container_updates=force_single_container_updates,
                                          registry_identity=registry_identity, system_assigned=system_assigned, user_assigned=user_assigned, revisions_mode=revisions_mode, target_label=target_label)
     return create_containerapp(cmd=cmd, name=name, resource_group_name=resource_group_name, managed_env=managed_env, image=image, env_vars=env_vars, ingress=ingress, target_port=target_port, registry_server=registry_server, registry_user=registry_user, registry_pass=registry_pass, workload_profile_name=workload_profile_name, environment_type=environment_type,
-                               registry_identity=registry_identity, system_assigned=system_assigned, user_assigned=user_assigned, revisions_mode=revisions_mode, target_label=target_label, cpu=cpu, memory=memory)
+                               registry_identity=registry_identity, system_assigned=system_assigned, user_assigned=user_assigned, revisions_mode=revisions_mode, target_label=target_label, cpu=cpu, memory=memory, kind=kind)
 
 
 def list_certificates(cmd, name, resource_group_name, location=None, certificate=None, thumbprint=None, managed_certificates_only=False, private_key_certificates_only=False):
@@ -3116,7 +3118,8 @@ def create_session_pool(cmd,
                         registry_user=None,
                         mi_user_assigned=None,
                         registry_identity=None,
-                        mi_system_assigned=False):
+                        mi_system_assigned=False,
+                        probe_yaml=None):
     raw_parameters = locals()
     session_pool_decorator = SessionPoolCreateDecorator(
         cmd=cmd,
@@ -3157,7 +3160,8 @@ def update_session_pool(cmd,
                         registry_user=None,
                         mi_user_assigned=None,
                         registry_identity=None,
-                        mi_system_assigned=False):
+                        mi_system_assigned=False,
+                        probe_yaml=None):
     raw_parameters = locals()
     session_pool_decorator = SessionPoolUpdateDecorator(
         cmd=cmd,
@@ -3342,6 +3346,25 @@ def delete_file_session_code_interpreter(cmd,
     session_code_interpreter_decorator.register_provider(CONTAINER_APPS_RP)
 
     r = session_code_interpreter_decorator.delete_file()
+
+    return r
+
+
+# session custom container commands
+def stop_session_custom_container(cmd,
+                                  name,
+                                  resource_group_name,
+                                  identifier):
+    raw_parameters = locals()
+    session_custom_container_decorator = SessionCustomContainerCommandsPreviewDecorator(
+        cmd=cmd,
+        client=SessionCustomContainerPreviewClient,
+        raw_parameters=raw_parameters,
+        models=CONTAINER_APPS_SDK_MODELS
+    )
+    session_custom_container_decorator.register_provider(CONTAINER_APPS_RP)
+
+    r = session_custom_container_decorator.stop_session()
 
     return r
 
@@ -3610,60 +3633,6 @@ def containerapp_debug(cmd, resource_group_name, name, container=None, revision=
                 conn.send(SSH_CTRL_C_MSG)
 
 
-def create_http_route_config(cmd, resource_group_name, name, http_route_config_name, yaml):
-    _validate_subscription_registered(cmd, CONTAINER_APPS_RP)
-    yaml_http_route_config = load_yaml_file(yaml)
-    # check if the type is dict
-    if not isinstance(yaml_http_route_config, dict):
-        raise ValidationError('Invalid YAML provided. Please see https://aka.ms/azure-container-apps-yaml for a valid YAML spec.')
-
-    http_route_config_envelope = {"properties": yaml_http_route_config}
-
-    try:
-        return HttpRouteConfigPreviewClient.create(cmd, resource_group_name, name, http_route_config_name, http_route_config_envelope)
-    except Exception as e:
-        handle_raw_exception(e)
-
-
-def update_http_route_config(cmd, resource_group_name, name, http_route_config_name, yaml):
-    _validate_subscription_registered(cmd, CONTAINER_APPS_RP)
-    yaml_http_route_config = load_yaml_file(yaml)
-    # check if the type is dict
-    if not isinstance(yaml_http_route_config, dict):
-        raise ValidationError('Invalid YAML provided. Please see https://aka.ms/azure-container-apps-yaml for a valid YAML spec.')
-
-    http_route_config_envelope = {"properties": yaml_http_route_config}
-
-    try:
-        return HttpRouteConfigPreviewClient.update(cmd, resource_group_name, name, http_route_config_name, http_route_config_envelope)
-    except Exception as e:
-        handle_raw_exception(e)
-
-
-def list_http_route_configs(cmd, resource_group_name, name):
-    _validate_subscription_registered(cmd, CONTAINER_APPS_RP)
-    try:
-        return HttpRouteConfigPreviewClient.list(cmd, resource_group_name, name)
-    except Exception as e:
-        handle_raw_exception(e)
-
-
-def show_http_route_config(cmd, resource_group_name, name, http_route_config_name):
-    _validate_subscription_registered(cmd, CONTAINER_APPS_RP)
-    try:
-        return HttpRouteConfigPreviewClient.show(cmd, resource_group_name, name, http_route_config_name)
-    except Exception as e:
-        handle_raw_exception(e)
-
-
-def delete_http_route_config(cmd, resource_group_name, name, http_route_config_name):
-    _validate_subscription_registered(cmd, CONTAINER_APPS_RP)
-    try:
-        return HttpRouteConfigPreviewClient.delete(cmd, resource_group_name, name, http_route_config_name)
-    except Exception as e:
-        handle_raw_exception(e)
-
-
 def list_label_history(cmd, resource_group_name, name):
     _validate_subscription_registered(cmd, CONTAINER_APPS_RP)
     try:
@@ -3831,108 +3800,5 @@ def remove_revision_label(cmd, resource_group_name, name, label, no_wait=False):
         r = ContainerAppPreviewClient.update(
             cmd=cmd, resource_group_name=resource_group_name, name=name, container_app_envelope=containerapp_patch_def, no_wait=no_wait)
         return r['properties']['configuration']['ingress']['traffic']
-    except Exception as e:
-        handle_raw_exception(e)
-
-
-def show_environment_premium_ingress(cmd, name, resource_group_name):
-    _validate_subscription_registered(cmd, CONTAINER_APPS_RP)
-
-    try:
-        env = ManagedEnvironmentPreviewClient.show(cmd, resource_group_name, name)
-        ingress_config = safe_get(env, "properties", "ingressConfiguration")
-        if not ingress_config:
-            return {"message": "No premium ingress configuration found for this environment, using default values."}
-
-        return ingress_config
-    except Exception as e:
-        handle_raw_exception(e)
-
-
-def add_environment_premium_ingress(cmd, name, resource_group_name, workload_profile_name, min_replicas=None, max_replicas=None, termination_grace_period=None, request_idle_timeout=None, header_count_limit=None, no_wait=False):
-    _validate_subscription_registered(cmd, CONTAINER_APPS_RP)
-
-    try:
-        ManagedEnvironmentPreviewClient.show(cmd, resource_group_name, name)
-        env_patch = {}
-        ingress_config = {}
-        safe_set(env_patch, "properties", "ingressConfiguration", value=ingress_config)
-
-        # Required
-        ingress_config["workloadProfileName"] = workload_profile_name
-        # Optional, remove if None
-        ingress_config["terminationGracePeriodSeconds"] = termination_grace_period
-        ingress_config["requestIdleTimeout"] = request_idle_timeout
-        ingress_config["headerCountLimit"] = header_count_limit
-
-        result = ManagedEnvironmentPreviewClient.update(
-            cmd=cmd,
-            resource_group_name=resource_group_name,
-            name=name,
-            managed_environment_envelope=env_patch,
-            no_wait=no_wait
-        )
-
-        return safe_get(result, "properties", "ingressConfiguration")
-
-    except Exception as e:
-        handle_raw_exception(e)
-
-
-def update_environment_premium_ingress(cmd, name, resource_group_name, workload_profile_name=None, min_replicas=None, max_replicas=None, termination_grace_period=None, request_idle_timeout=None, header_count_limit=None, no_wait=False):
-    _validate_subscription_registered(cmd, CONTAINER_APPS_RP)
-
-    try:
-        ManagedEnvironmentPreviewClient.show(cmd, resource_group_name, name)
-        env_patch = {}
-        ingress_config = {}
-
-        if workload_profile_name is not None:
-            ingress_config["workloadProfileName"] = workload_profile_name
-        if termination_grace_period is not None:
-            ingress_config["terminationGracePeriodSeconds"] = termination_grace_period
-        if request_idle_timeout is not None:
-            ingress_config["requestIdleTimeout"] = request_idle_timeout
-        if header_count_limit is not None:
-            ingress_config["headerCountLimit"] = header_count_limit
-
-        # Only add ingressConfiguration to the patch if any values were specified
-        if ingress_config:
-            safe_set(env_patch, "properties", "ingressConfiguration", value=ingress_config)
-        else:
-            return {"message": "No changes specified for premium ingress configuration"}
-
-        # Update the environment with the patched ingress configuration
-        result = ManagedEnvironmentPreviewClient.update(
-            cmd=cmd,
-            resource_group_name=resource_group_name,
-            name=name,
-            managed_environment_envelope=env_patch,
-            no_wait=no_wait
-        )
-
-        return safe_get(result, "properties", "ingressConfiguration")
-
-    except Exception as e:
-        handle_raw_exception(e)
-
-
-def remove_environment_premium_ingress(cmd, name, resource_group_name, no_wait=False):
-    _validate_subscription_registered(cmd, CONTAINER_APPS_RP)
-
-    try:
-        ManagedEnvironmentPreviewClient.show(cmd, resource_group_name, name)
-        env_patch = {}
-        # Remove the whole section to restore defaults
-        safe_set(env_patch, "properties", "ingressConfiguration", value=None)
-
-        ManagedEnvironmentPreviewClient.update(
-            cmd=cmd,
-            resource_group_name=resource_group_name,
-            name=name,
-            managed_environment_envelope=env_patch,
-            no_wait=no_wait
-        )
-
     except Exception as e:
         handle_raw_exception(e)

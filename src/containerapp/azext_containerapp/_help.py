@@ -161,6 +161,9 @@ helps['containerapp up'] = """
     - name: Create a container app and deploy a model from Azure AI Foundry
       text: |
             az containerapp up -n my-containerapp -l westus3 --model-registry azureml --model-name Phi-4 --model-version 7
+    - name: Create an Azure Functions on Azure Container Apps (kind=functionapp)
+      text: |
+            az containerapp up -n my-containerapp --image my-app:v1.0 --kind functionapp
 """
 
 
@@ -917,7 +920,7 @@ helps['containerapp create'] = """
           az containerapp create -n my-containerapp -g MyResourceGroup \\
               --image my-app:v1.0 --environment MyContainerappEnv \\
               --enable-java-agent
-    - name: Create a container app with kind as functionapp
+    - name: Create an Azure Functions on Azure Container Apps (kind=functionapp)
       text: |
           az containerapp create -n my-containerapp -g MyResourceGroup \\
               --image my-app:v1.0 --environment MyContainerappEnv \\
@@ -1964,6 +1967,10 @@ helps['containerapp sessionpool create'] = """
       text: |
           az containerapp sessionpool create -n mysessionpool -g MyResourceGroup \\
               --location eastasia
+    - name: Create or update a Session Pool with container type Shell default settings.
+      text: |
+          az containerapp sessionpool create -n mysessionpool -g MyResourceGroup \\
+              --container-type Shell --location westus3
     - name: Create or update a Session Pool with container type PythonLTS, with max concurrent sessions is 30, ready session instances 20.
       text: |
           az containerapp sessionpool create -n mysessionpool -g MyResourceGroup \\
@@ -2007,6 +2014,11 @@ helps['containerapp sessionpool create'] = """
           az containerapp sessionpool create -n mysessionpool -g MyResourceGroup \\
               --environment MyEnvironment --cpu 0.5 --memory 1Gi --target-port 80 --container-type CustomContainer \\
               --cooldown-period 360 --location eastasia
+    - name: Create or update a Session Pool with container type CustomContainer with container probes
+      text: |
+          az containerapp sessionpool create -n mysessionpool -g MyResourceGroup \\
+              --environment MyEnvironment --cpu 0.5 --memory 1Gi --target-port 80 --container-type CustomContainer \\
+              --probe-yaml config.yaml --location eastasia
 """
 
 helps['containerapp sessionpool update'] = """
@@ -2016,6 +2028,9 @@ helps['containerapp sessionpool update'] = """
     - name: Update a session pool's max concurrent sessions configuration and image.
       text: |
           az containerapp sessionpool update -n mysessionpool -g MyResourceGroup --max-sessions 20 --image MyNewImage
+    - name: Update the container probes of a CustomContainer type session pool.
+      text: |
+          az containerapp sessionpool update -n mysessionpool -g MyResourceGroup --probe-yaml config.yaml
 """
 
 helps['containerapp sessionpool delete'] = """
@@ -2047,12 +2062,22 @@ helps['containerapp sessionpool list'] = """
           az containerapp sessionpool list -g MyResourceGroup
 """
 
-# code interpreter commands
+# Session Commands
 helps['containerapp session'] = """
     type: group
     short-summary: Commands to manage sessions.To learn more about individual commands under each subgroup run containerapp session [subgroup name] --help.
 """
 
+helps['containerapp session stop'] = """
+    type: command
+    short-summary: Stop a custom container session.
+    examples:
+    - name: Stop a custom container session.
+      text: |
+          az containerapp session stop -n MySessionPool -g MyResourceGroup --identifier MySession
+"""
+
+# code interpreter commands
 helps['containerapp session code-interpreter'] = """
     type: group
     short-summary: Commands to interact with and manage code interpreter sessions.
@@ -2315,103 +2340,4 @@ helps['containerapp label-history show'] = """
     - name: Show Label History
       text: |
           az containerapp label-history show -n my-containerapp -g MyResourceGroup --label LabelName
-"""
-
-helps['containerapp env http-route-config'] = """
-    type: group
-    short-summary: Commands to manage environment level http routing.
-"""
-
-helps['containerapp env http-route-config list'] = """
-    type: command
-    short-summary: List the http route configs in the environment.
-    examples:
-    - name: List the http route configs in the environment.
-      text: |
-          az containerapp env http-route-config list -g MyResourceGroup -n MyEnvironment
-"""
-
-helps['containerapp env http-route-config create'] = """
-    type: command
-    short-summary: Create a new http route config.
-    examples:
-    - name: Create a new route from a yaml file.
-      text: |
-          az containerapp env http-route-config create -g MyResourceGroup -n MyEnvironment -r configname --yaml config.yaml
-"""
-
-helps['containerapp env http-route-config update'] = """
-    type: command
-    short-summary: Update a http route config.
-    examples:
-    - name: Update a route in the environment from a yaml file.
-      text: |
-          az containerapp env http-route-config update -g MyResourceGroup -n MyEnvironment -r configname --yaml config.yaml
-"""
-
-helps['containerapp env http-route-config show'] = """
-    type: command
-    short-summary: Show a http route config.
-    examples:
-    - name: Show a route in the environment.
-      text: |
-          az containerapp env http-route-config show -g MyResourceGroup -n MyEnvironment -r configname
-"""
-
-helps['containerapp env http-route-config delete'] = """
-    type: command
-    short-summary: Delete a http route config.
-    examples:
-    - name: Delete a route from the environment.
-      text: |
-          az containerapp env http-route-config delete -g MyResourceGroup -n MyEnvironment -r configname
-"""
-
-helps['containerapp env premium-ingress show'] = """
-    type: command
-    short-summary: Show the premium ingress settings for the environment.
-    examples:
-    - name: Show the premium ingress settings for the environment.
-      text: |
-          az containerapp env premium-ingress show -g MyResourceGroup -n MyEnvironment
-"""
-
-helps['containerapp env premium-ingress'] = """
-    type: group
-    short-summary: Configure premium ingress settings for the environment.
-    long-summary: |
-        Premium ingress settings apply to all applications in the environment. They allow moving the ingress instances to a workload profile and scaling them beyond the system defaults to enable high traffic workloads. Other settings include request idle timeouts, header count limits, and the termination grace period.
-    examples:
-    - name: Enable premium ingress for the environment.
-      text: |
-          az containerapp env premium-ingress add -g MyResourceGroup -n MyEnvironment -w WorkloadProfileName
-"""
-
-helps['containerapp env premium-ingress add'] = """
-    type: command
-    short-summary: Enable the premium ingress settings for the environment.
-    long-summary: |
-        Unspecified optional parameters will be cleared from any existing configuration.
-    examples:
-    - name: Add the premium ingress settings for the environment.
-      text: |
-          az containerapp env premium-ingress add -g MyResourceGroup -n MyEnvironment -w WorkloadProfileName
-"""
-
-helps['containerapp env premium-ingress update'] = """
-    type: command
-    short-summary: Update the premium ingress settings for the environment.
-    examples:
-    - name: Update the workload profile used for premium ingress.
-      text: |
-          az containerapp env premium-ingress update -g MyResourceGroup -n MyEnvironment -w WorkloadProfileName
-"""
-
-helps['containerapp env premium-ingress remove'] = """
-    type: command
-    short-summary: Remove the ingress settings and restores the system to default values.
-    examples:
-    - name: Reset the ingress settings for the environment to its default values
-      text: |
-          az containerapp env premium-ingress remove -g MyResourceGroup -n MyEnvironment
 """
